@@ -142,7 +142,9 @@ class Game {
             console.log("error: " + 13);
             return false;
         }
-        if (this.dice.filter(dice => !dice.used).map(dice => dice.value).indexOf(Math.abs(to - from)) === -1) {
+        // TO DO
+        // Check condition
+        if (from < WIDTH && this.dice.filter(dice => !dice.used).map(dice => dice.value).indexOf(Math.abs(to - from)) === -1) {
             console.log("error: " + 14);
             return false;
         }
@@ -159,13 +161,15 @@ class Game {
             this.capture(to);
         this.addOne(to, fromColor);
 
+        // TO DO 
+        // CASE WHEN piece is OUT
         let dice = this.dice.find(d => d.value === Math.abs(to - from) && d.used === false);
         if (dice) dice.used = true;
 
         this.render();
     }
     endTurn() {
-        if (this.areMovesAvailable && this.dice.filter(dice => !dice.used).length > 0) return false;
+        if (this.areMovesAvailable()) return this.render();
         this.turn = this.turn === BLACK ? WHITE : BLACK;
         this.rollDice();
     }
@@ -190,6 +194,7 @@ class Game {
                 allowed: true
             }]);
         }
+        this.areMovesAvailable();
         this.render();
     }
     renderBoard() {
@@ -263,17 +268,32 @@ class Game {
                 let from = +event.dataTransfer.getData("text/plain");
                 let to = +cell.dataset.cell;
                 this.move(from, to);
+                this.areMovesAvailable();
+                this.render();
                 FROM = -1;
             });
         });
     }
     isDiceAvailable(dice) {
+        if (this.turn === WHITE && this.hasMinOne(PENDING_WHITE))
+            return this.getCount(dice - 1) < 2 || this.getColor(dice - 1) === WHITE;
+        if (this.turn === BLACK && this.hasMinOne(PENDING_BLACK))
+            return this.getCount(WIDTH - dice) < 2 || this.getColor(WIDTH - dice) === BLACK;
+        for (let i = 0; i < WIDTH; i++) {
+            if (this.hasMinOne(i) && WHITE === this.turn && this.isAllowed(i, i + dice)) {
+                return true;
+            }
+            if (this.hasMinOne(i) && BLACK === this.turn && this.isAllowed(i, i - dice)) {
+                return true;
+            }
+        }
         return false;
     }
     areMovesAvailable() {
-        // isAllowed();
-        // parse every piece and check if a piece can be moved DICE[i] squares; if not, mark the DICE[i] as allowed: false
-        return true;
+        for (let i = 0; i < this.dice.length; i++) {
+            this.dice[i].allowed = this.isDiceAvailable(this.dice[i].value);
+        }
+        return this.dice.filter(dice => dice.allowed && !dice.used).length > 0;
     }
     initEvents() {
         this.initDragEvents();
@@ -285,7 +305,7 @@ class Game {
             '<p class="trigammon-turn">' + (this.turn === WHITE ? 'WHITE' : 'BLACK') + '</p>' +
             '<button class="trigammon-end-turn">END TURN</button>' +
             '<div class="trigammon-dices">' + 
-                this.dice.map(dice => `<div class="trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'}">${dice.value}</div>`).join('') +
+                this.dice.map(dice => `<div class="trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'} trigammon-dice-${dice.allowed ? 'allowed' : 'notallowed'}">${dice.value}</div>`).join('') +
             '</div>' +
         '</div>';
     }
