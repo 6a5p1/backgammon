@@ -2,8 +2,10 @@ const EMPTY = 0;
 const BLACK = 0b0;
 const WHITE = 0b1;
 const WIDTH = 24;
-const PENDING_BLACK = WIDTH + BLACK;
-const PENDING_WHITE = WIDTH + WHITE;
+const PENDING = {
+    [BLACK]: 100,
+    [WHITE]: 101
+};
 
 class Game {
     constructor() {
@@ -14,7 +16,7 @@ class Game {
         this.render();
     }
     init() {
-        this.board = new Array(WIDTH + 2).fill(EMPTY);
+        this.board = new Array(102).fill(EMPTY);
         this.board[0] = (2 << 1) + WHITE;
         this.board[5] = (5 << 1) + BLACK;
 
@@ -27,13 +29,20 @@ class Game {
         this.board[18] = (5 << 1) + WHITE;
         this.board[23] = (2 << 1) + BLACK;
 
+        this.state = [];
+
+        // this.board = [4, 0, 4, 2, 4, 4, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 15, 5, 5, 0, 0, 9, 0, 0]
+
         this.rollDice();
     }
+    isColor(cell, color) {
+        return !this.isEmpty(cell) && this.board[cell] % 2 === color;
+    }
     isWhite(cell) {
-        return !this.isEmpty(cell) && this.board[cell] % 2 === WHITE;
+        return this.isColor(cell, WHITE);
     }
     isBlack(cell) {
-        return !this.isEmpty(cell) && this.board[cell] % 2 === BLACK;
+        return this.isColor(cell, BLACK);
     }
     isEmpty(cell) {
         return this.board[cell] === EMPTY;
@@ -55,21 +64,21 @@ class Game {
     hasOne(cell) {
         return this.getCount(cell) === 1;
     }
-    setWhite(cell) {
+    markAsWhite(cell) {
         if (this.board[cell] % 2 === BLACK) {
             this.board[cell] += WHITE;
         }
     }
-    setBlack(cell) {
+    markAsBlack(cell) {
         if (this.board[cell] % 2 === WHITE) {
             this.board[cell] -= WHITE;
         }
     }
-    setColor(cell, color) {
+    markAsColor(cell, color) {
         if (color === WHITE) {
-            this.setWhite(cell);
+            this.markAsWhite(cell);
         } else if (color === BLACK) {
-            this.setBlack(cell);
+            this.markAsBlack(cell);
         }
     }
     removeOne(cell) {
@@ -79,18 +88,19 @@ class Game {
     }
     addOne(cell, color) {
         this.board[cell] += 0b10;
-        this.setColor(cell, color);
+        this.markAsColor(cell, color);
     }
     capture(cell) {
-        if (this.getColor(cell) === WHITE) {
-            this.addOne(PENDING_WHITE, WHITE);
-        } else {
-            this.addOne(PENDING_BLACK, BLACK);
-        }
+        let color = this.getColor(cell);
+        this.addOne(PENDING[color], color);
         this.removeOne(cell);
     }
+    getCapturedCount(color) {
+        return this.getCount(PENDING[color]);
+    }
     isAllowed(from, to) {
-        if (from < 0 || from > WIDTH + 2 || to < 0 || to > WIDTH + 2) {
+        if (from < 0 || (from > WIDTH && from !== PENDING[WHITE] && from !== PENDING[BLACK]) ||
+            to < 0 || (to > WIDTH && to !== PENDING[WHITE] && to !== PENDING[BLACK])) {
             console.log("error: " + 1);
             return false;
         }
@@ -118,7 +128,7 @@ class Game {
             console.log("error: " + 7);
             return false;
         }
-        if (this.isWhite(from) && from !== PENDING_WHITE && to < from) {
+        if (this.isWhite(from) && from !== PENDING[WHITE] && to < from) {
             console.log("error: " + 8);
             return false;
         }
@@ -126,51 +136,75 @@ class Game {
             console.log("error: " + 9);
             return false;
         }
-        if (from === PENDING_BLACK && (to > WIDTH || to < WIDTH * 3 / 4)) {
+        if (from === PENDING[BLACK] && (to > WIDTH || to < WIDTH * 3 / 4)) {
             console.log("error: " + 10);
             return false;
         }
-        if (from === PENDING_WHITE && (to >= WIDTH / 4)) {
+        if (from === PENDING[WHITE] && (to >= WIDTH / 4)) {
             console.log("error: " + 11);
             return false;
         }
-        if (this.turn === WHITE && this.hasMinOne(PENDING_WHITE) && from !== PENDING_WHITE) {
+        if (this.hasMinOne(PENDING[this.turn]) && from !== PENDING[this.turn]) {
             console.log("error: " + 12);
             return false;
         }
-        if (this.turn === BLACK && this.hasMinOne(PENDING_BLACK) && from !== PENDING_BLACK) {
+        if (this.dice.filter(dice => 
+            !dice.used && (
+                dice.value === Math.abs(to - from)
+                || (
+                    from === PENDING[this.turn]
+                    && dice.value === (this.turn === WHITE ? to + 1 : WIDTH - to)
+                )
+            )
+        ).length === 0) {
             console.log("error: " + 13);
             return false;
         }
-        // TO DO
-        // Check condition
-        if (from < WIDTH && this.dice.filter(dice => !dice.used).map(dice => dice.value).indexOf(Math.abs(to - from)) === -1) {
-            console.log("error: " + 14);
-            return false;
-        }
         return true;
+    }
+    undo() {
+        if (this.state.length === 0) return;
+        let obj = this.state.pop();
+        this.board = obj.board;
+        this.dice = obj.dice;
+
+        this.render();
     }
     move(from, to) {
         if (!this.isAllowed(from, to))
             return false;
 
-        let fromColor = this.isWhite(from) ? WHITE : BLACK;
-        let toColor = this.isWhite(to) ? WHITE : BLACK;
+        this.state.push({
+            dice: JSON.parse(JSON.stringify(this.dice)),
+            board: JSON.parse(JSON.stringify(this.board)),
+            turn: this.turn
+        });
+
+        let fromColor = this.getColor(from);
+        let toColor = this.getColor(to);
         this.removeOne(from);
         if (fromColor !== toColor && this.hasOne(to))
             this.capture(to);
         this.addOne(to, fromColor);
 
-        // TO DO 
-        // CASE WHEN piece is OUT
-        let dice = this.dice.find(d => d.value === Math.abs(to - from) && d.used === false);
-        if (dice) dice.used = true;
+        let dice = this.dice.find(d => (
+            (d.value === Math.abs(to - from) || (from === PENDING[this.turn] && d.value === (this.turn === WHITE ? to + 1 : WIDTH - to)))
+            && d.used === false
+        ));
+        if (dice) {
+            dice.used = true;
+        } else {
+            // debugger;
+        }
 
         this.render();
+
+        return true;
     }
     endTurn() {
-        if (this.areMovesAvailable()) return this.render();
+        if (this.checkMovesAvailable()) return this.render();
         this.turn = this.turn === BLACK ? WHITE : BLACK;
+        this.state = [];
         this.rollDice();
     }
     rollDice() {
@@ -183,6 +217,9 @@ class Game {
             used: false,
             allowed: true
         }];
+        if (this.dice[1].value > this.dice[0].value) {
+            this.dice = this.dice.reverse();
+        }
         if (this.dice[0].value === this.dice[1].value) {
             this.dice = this.dice.concat([{
                 value: this.dice[0].value,
@@ -194,47 +231,98 @@ class Game {
                 allowed: true
             }]);
         }
-        this.areMovesAvailable();
+        this.checkMovesAvailable();
         this.render();
     }
+    moveCellBy(cell, dice) {
+        if (this.isWhite(cell)) 
+            if (cell === PENDING[WHITE])
+                return this.move(cell, dice - 1);
+            else
+                return this.move(cell, cell + dice);
+        else if (this.isBlack(cell)) 
+            if (cell === PENDING[BLACK])
+                return this.move(cell, WIDTH - dice);
+            else
+                return this.move(cell, cell - dice);
+        return false;
+    }
+    isDiceAvailable(dice) {
+        if (this.turn === WHITE && this.hasMinOne(PENDING[this.turn]))
+            return this.getCount(dice - 1) < 2 || this.getColor(dice - 1) === this.turn;
+        if (this.turn === BLACK && this.hasMinOne(PENDING[this.turn]))
+            return this.getCount(WIDTH - dice) < 2 || this.getColor(WIDTH - dice) === this.turn;
+        for (let i = 0; i < WIDTH; i++) {
+            if (this.hasMinOne(i) && WHITE === this.turn && this.isAllowed(i, i + dice))
+                return true;
+            if (this.hasMinOne(i) && BLACK === this.turn && this.isAllowed(i, i - dice))
+                return true;
+        }
+        return false;
+    }
+    checkMovesAvailable() {
+        for (let i = 0; i < this.dice.length; i++) {
+            this.dice[i].allowed = this.isDiceAvailable(this.dice[i].value);
+        }
+        return this.dice.filter(dice => dice.allowed && !dice.used).length > 0;
+    }
+
+
+
     renderBoard() {
+        const MAX = 5;
         let q = new Array(6).fill('');
         for (let i = WIDTH / 2 - 1; i >= WIDTH / 4; i--) {
             q[0] += `<div data-cell="${i}"><div class="flex-c">`;
-            for (let j = 0; j < this.board[i] >> 1; j++)
-                q[0] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}"></span>`;
+            let count = this.board[i] >> 1;
+            let forloops = count > MAX ? MAX : count;
+            for (let j = 0; j < forloops; j++)
+                q[0] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}">${count > MAX && j === MAX - 1 ? count : ''}</span>`;
             q[0] += '</div></div>';
         }
         for (let i = WIDTH / 4 - 1; i >= 0; i--) {
             q[1] += `<div data-cell="${i}"><div class="flex-c">`;
-            for (let j = 0; j < this.board[i] >> 1; j++)
-                q[1] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}"></span>`;
+            let count = this.board[i] >> 1;
+            let forloops = count > MAX ? MAX : count;
+            for (let j = 0; j < forloops; j++)
+                q[1] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}">${count > MAX && j === MAX - 1 ? count : ''}</span>`;
             q[1] += '</div></div>';
         }
         for (let i = WIDTH / 2; i < WIDTH * 3 / 4; i++) {
             q[2] += `<div data-cell="${i}"><div class="flex-ci">`;
-            for (let j = 0; j < this.board[i] >> 1; j++)
-                q[2] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}"></span>`;
+            let count = this.board[i] >> 1;
+            let forloops = count > MAX ? MAX : count;
+            for (let j = 0; j < forloops; j++)
+                q[2] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}">${count > MAX && j === 0 ? count : ''}</span>`;
             q[2] += '</div></div>';
         }
         for (let i = WIDTH * 3 / 4; i < WIDTH; i++) {
             q[3] += `<div data-cell="${i}"><div class="flex-ci">`;
-            for (let j = 0; j < this.board[i] >> 1; j++)
-                q[3] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}"></span>`;
+            let count = this.board[i] >> 1;
+            let forloops = count > MAX ? MAX : count;
+            for (let j = 0; j < forloops; j++)
+                q[3] += `<span class="cell ${this.board[i] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === i ? 'dragged' : ''}">${count > MAX && j === 0 ? count : ''}</span>`;
             q[3] += '</div></div>';
         }
 
-        q[4] += `<div data-cell="${PENDING_BLACK}" class="pending-black"><div class="flex-c">`;
-        for (let j = 0; j < this.board[PENDING_BLACK] >> 1; j++)
-            q[4] += `<span class="cell ${this.board[PENDING_BLACK] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING_BLACK ? 'dragged' : ''}"></span>`;
+        let totalB = this.board[PENDING[BLACK]] >> 1;
+        let showB = totalB >= 3;
+        q[4] += `<div data-cell="${PENDING[BLACK]}" class="pending-black"><div class="flex-c">`;
+        for (let j = 0; j < (totalB < 3 ? totalB : 1); j++)
+            q[4] += `<span class="cell ${this.board[PENDING[BLACK]] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING[BLACK] ? 'dragged' : ''}">${showB ? totalB : ''}</span>`;
         q[4] += '</div></div>';
 
-        q[5] += `<div data-cell="${PENDING_WHITE}" class="pending-white"><div class="flex-c">`;
-        for (let j = 0; j < this.board[PENDING_WHITE] >> 1; j++)
-            q[5] += `<span class="cell ${this.board[PENDING_WHITE] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING_WHITE ? 'dragged' : ''}"></span>`;
+        let totalW = this.board[PENDING[WHITE]] >> 1;
+        let showW = totalW >= 3;
+        q[5] += `<div data-cell="${PENDING[WHITE]}" class="pending-white"><div class="flex-c">`;
+        for (let j = 0; j < (totalW < 3 ? totalW : 1); j++)
+            q[5] += `<span class="cell ${this.board[PENDING[WHITE]] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING[WHITE] ? 'dragged' : ''}">${showW ? totalW : ''}</span>`;
         q[5] += '</div></div>';
 
-        return '<div class="trigammon-table">' + q.map((w, i) => `<div class="q${i}">${w}</div>`).join('') + '</div>';
+        return `<div class="trigammon-table">
+            ${q.map((w, i) => `<div class="q${i}">${w}</div>`).join('')}
+            ${this.renderDices()}
+        </div>`;
     }
     initDragEvents() {
         let FROM = -1;
@@ -245,6 +333,20 @@ class Game {
                 FROM = +event.target.closest('[data-cell]').dataset.cell;
                 event.dataTransfer.setData("text/plain", FROM);
                 // event.target.classList.add('dragged');
+            });
+            piece.addEventListener('click', (event) => {
+                event.preventDefault();
+                let dice = this.dice.filter(d => !d.used && d.allowed);
+                if (dice.length === 0) return false;
+                FROM = +event.target.closest('[data-cell]').dataset.cell;
+                let moveStatus = this.moveCellBy(FROM, dice[0].value);
+                if (moveStatus === false && dice[1]) {
+                    moveStatus = this.moveCellBy(FROM, dice[1].value);
+                }
+                if (moveStatus !== false) {
+                    this.checkMovesAvailable();
+                    this.render();
+                }
             });
         });
 
@@ -267,47 +369,40 @@ class Game {
                 console.log('drop');
                 let from = +event.dataTransfer.getData("text/plain");
                 let to = +cell.dataset.cell;
-                this.move(from, to);
-                this.areMovesAvailable();
-                this.render();
+                if (this.move(from, to)) {
+                    this.checkMovesAvailable();
+                    this.render();
+                }
                 FROM = -1;
             });
         });
     }
-    isDiceAvailable(dice) {
-        if (this.turn === WHITE && this.hasMinOne(PENDING_WHITE))
-            return this.getCount(dice - 1) < 2 || this.getColor(dice - 1) === WHITE;
-        if (this.turn === BLACK && this.hasMinOne(PENDING_BLACK))
-            return this.getCount(WIDTH - dice) < 2 || this.getColor(WIDTH - dice) === BLACK;
-        for (let i = 0; i < WIDTH; i++) {
-            if (this.hasMinOne(i) && WHITE === this.turn && this.isAllowed(i, i + dice)) {
-                return true;
-            }
-            if (this.hasMinOne(i) && BLACK === this.turn && this.isAllowed(i, i - dice)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    areMovesAvailable() {
-        for (let i = 0; i < this.dice.length; i++) {
-            this.dice[i].allowed = this.isDiceAvailable(this.dice[i].value);
-        }
-        return this.dice.filter(dice => dice.allowed && !dice.used).length > 0;
-    }
     initEvents() {
         this.initDragEvents();
+
         let endTurnBtn = this.el.querySelector('.trigammon-end-turn');
         endTurnBtn.addEventListener('click', this.endTurn.bind(this));
+
+        let dices = this.el.querySelector('.trigammon-dices');
+        if (dices) dices.addEventListener('click', (event) => {
+            this.dice = this.dice.reverse();
+            this.render();
+        });
+
+        let undoBtn = this.el.querySelector('.trigammon-undo');
+        undoBtn.addEventListener('click', this.undo.bind(this));        
     }
     renderButtons() {
-        return '<div class="trigammon-buttons">' +
-            '<p class="trigammon-turn">' + (this.turn === WHITE ? 'WHITE' : 'BLACK') + '</p>' +
-            '<button class="trigammon-end-turn">END TURN</button>' +
-            '<div class="trigammon-dices">' + 
-                this.dice.map(dice => `<div class="trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'} trigammon-dice-${dice.allowed ? 'allowed' : 'notallowed'}">${dice.value}</div>`).join('') +
-            '</div>' +
-        '</div>';
+        return `<div class="trigammon-buttons">
+            <p class="trigammon-turn">${this.turn === WHITE ? 'WHITE' : 'BLACK'}</p>
+            <button class="trigammon-end-turn" ${this.dice.filter(d => !d.used && d.allowed).length ? 'disabled' : ''}>END TURN</button>
+            <button class="trigammon-undo" ${this.state.length === 0 ? 'disabled' : ''}>UNDO</button>
+        </div>`;
+    }
+    renderDices() {
+        return `<div class="trigammon-dices trigammon-dices-${this.turn === WHITE ? 'white' : 'black'} ${this.dice.length === 4 ? 'trigammon-dices-double' : ''}">
+            ${this.dice.map(dice => `<div class="trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'} trigammon-dice-${dice.allowed ? 'allowed' : 'notallowed'}">${dice.value}</div>`).join('')}
+        </div>`;
     }
     render() {
         this.el.innerHTML = this.renderBoard() + this.renderButtons();
