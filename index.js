@@ -191,12 +191,7 @@ class Game {
             (d.value === Math.abs(to - from) || (from === PENDING[this.turn] && d.value === (this.turn === WHITE ? to + 1 : WIDTH - to)))
             && d.used === false
         ));
-        if (dice) {
-            dice.used = true;
-        } else {
-            // debugger;
-        }
-
+        if (dice) dice.used = true;
         this.render();
 
         return true;
@@ -268,7 +263,6 @@ class Game {
     }
 
 
-
     renderBoard() {
         const MAX = 5;
         let q = new Array(6).fill('');
@@ -319,12 +313,14 @@ class Game {
             q[5] += `<span class="cell ${this.board[PENDING[WHITE]] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING[WHITE] ? 'dragged' : ''}">${showW ? totalW : ''}</span>`;
         q[5] += '</div></div>';
 
-        return `<div class="trigammon-table">
-            ${q.map((w, i) => `<div class="q${i}">${w}</div>`).join('')}
-            ${this.renderDices()}
-        </div>`;
+        return `${q.map((w, i) => `<div class="q${i}">${w}</div>`).join('')}
+            <div class="trigammon-dices trigammon-dices-${this.turn === WHITE ? 'white' : 'black'} ${this.dice.length === 4 ? 'trigammon-dices-double' : ''}">
+                ${this.dice.filter(d => !d.used && d.allowed).length === 0 ? '<button class="trigammon-end-turn">END TURN</button>' : ''}
+                ${this.dice.map(dice => `<div class="dice dice-${dice.value} trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'} trigammon-dice-${dice.allowed ? 'allowed' : 'notallowed'}">${dice.value}</div>`).join('')}
+                ${this.state.length > 0 ? '<button class="trigammon-undo">UNDO</button>' : ''}
+            </div>`;
     }
-    initDragEvents() {
+    initEvents() {
         let FROM = -1;
         let pieces = [].slice.apply(this.el.querySelectorAll(`.cell.cell-${this.turn === WHITE ? 'white' : 'black'}`));
         pieces.forEach(piece => {
@@ -376,12 +372,9 @@ class Game {
                 FROM = -1;
             });
         });
-    }
-    initEvents() {
-        this.initDragEvents();
 
         let endTurnBtn = this.el.querySelector('.trigammon-end-turn');
-        endTurnBtn.addEventListener('click', this.endTurn.bind(this));
+        if (endTurnBtn) endTurnBtn.addEventListener('click', this.endTurn.bind(this));
 
         let dices = this.el.querySelector('.trigammon-dices');
         if (dices) dices.addEventListener('click', (event) => {
@@ -390,22 +383,10 @@ class Game {
         });
 
         let undoBtn = this.el.querySelector('.trigammon-undo');
-        undoBtn.addEventListener('click', this.undo.bind(this));        
-    }
-    renderButtons() {
-        return `<div class="trigammon-buttons">
-            <p class="trigammon-turn">${this.turn === WHITE ? 'WHITE' : 'BLACK'}</p>
-            <button class="trigammon-end-turn" ${this.dice.filter(d => !d.used && d.allowed).length ? 'disabled' : ''}>END TURN</button>
-            <button class="trigammon-undo" ${this.state.length === 0 ? 'disabled' : ''}>UNDO</button>
-        </div>`;
-    }
-    renderDices() {
-        return `<div class="trigammon-dices trigammon-dices-${this.turn === WHITE ? 'white' : 'black'} ${this.dice.length === 4 ? 'trigammon-dices-double' : ''}">
-            ${this.dice.map(dice => `<div class="trigammon-dice trigammon-dice-${dice.used ? 'used' : 'unused'} trigammon-dice-${dice.allowed ? 'allowed' : 'notallowed'}">${dice.value}</div>`).join('')}
-        </div>`;
+        if (undoBtn) undoBtn.addEventListener('click', this.undo.bind(this));        
     }
     render() {
-        this.el.innerHTML = this.renderBoard() + this.renderButtons();
+        this.el.innerHTML = this.renderBoard();
         this.initEvents();
     }
 }

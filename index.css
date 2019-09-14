@@ -1,9 +1,13 @@
 .trigammon {
+    width: 1000px;
+    height: 686px;
     position: relative;
-    border: 3px double #000;
-    padding: 10px;
     font-family: cursive;
     user-select: none;
+    padding: 25px;
+    box-sizing: border-box;
+    background: url(back.gif) no-repeat top left;
+    background-size: cover;
 }
 .trigammon:after {
     content: '';
@@ -13,24 +17,14 @@
 .trigammon * {
     box-sizing: border-box;
 }
-.trigammon-table {
-    width: 1000px;
-    height: 686px;
-    float: left;
-    padding: 25px;
-    position: relative;
-    box-sizing: border-box;
-    background: url(back.gif) no-repeat top left;
-    background-size: cover;
-}
-.trigammon-table [data-cell] {
+.trigammon [data-cell] {
     width: 75px;
     height: 100%;
     display: inline-block;
     vertical-align: top;
     box-sizing: border-box;
 }
-.trigammon-table [data-cell] .cell {
+.trigammon [data-cell] .cell {
     display: block;
     text-align: center;
     border-radius: 50%;
@@ -43,86 +37,94 @@
     font-size: 24px;
     font-weight: 700;
     color: #aaa;
+    transition: all .1s;
 }
-.trigammon-table [data-cell] .cell-white {
+.trigammon [data-cell] .cell[draggable]:hover {
+    cursor: pointer;
+    border-width: 2px;
+}
+.trigammon [data-cell] .cell-white[draggable]:hover {
+    box-shadow: inset 0 0 3px #999;
+}
+.trigammon [data-cell] .cell-black[draggable]:hover {
+    box-shadow: inset 0 0 3px #fff;
+}
+.trigammon [data-cell] .cell-white {
     background: #fff;
     border: 1px solid #ddd;
 }
-.trigammon-table [data-cell] .cell-black {
+.trigammon [data-cell] .cell-black {
     background: #444;
     border: 1px solid #222;
 }
-.trigammon-table [data-cell] .dragged {
-    border-color: red;
-}
-.trigammon-table .q0,
-.trigammon-table .q1,
-.trigammon-table .q2,
-.trigammon-table .q3 {
+.trigammon .q0,
+.trigammon .q1,
+.trigammon .q2,
+.trigammon .q3 {
     position: absolute;
     width: 450px;
     height: 290px;
 }
-.trigammon-table .q0 {
+.trigammon .q0 {
     top: 25px;
     left: 25px;
 }
-.trigammon-table .q1 {
+.trigammon .q1 {
     top: 25px;
     left: calc(50% + 23px);
 }
-.trigammon-table .q2 {
+.trigammon .q2 {
     bottom: 25px;
     left: 25px;
 }
-.trigammon-table .q3 {
+.trigammon .q3 {
     bottom: 25px;
     left: calc(50% + 23px);
 }
-.trigammon-table .q4 {
+.trigammon .q4 {
     position: absolute;
     left: calc(50% - 37.5px);
     bottom: 60%;
 }
-.trigammon-table .q5 {
+.trigammon .q5 {
     position: absolute;
     left: calc(50% - 37.5px);
     top: 60%;
 }
-.trigammon-table .flex-c {
+.trigammon .flex-c {
 }
-.trigammon-table .flex-ci {
+.trigammon .flex-ci {
     position: absolute;
     bottom: 0;
     width: 75px;
 }
-.trigammon-table .dragover {
+.trigammon .dragover {
     background: rgba(0, 0, 0, .04);
 }
 
 
-.trigammon-buttons {
-    float: left;
+.trigammon button {
     width: 100px;
-    margin-left: 20px;
-}
-.trigammon-buttons button {
     padding: 10px;
-    width: 100%;
-    background: #fff;
-    border: 1px solid #ccc;
-    color: #444;
     text-transform: uppercase;
-    box-shadow: inset 0 0 3px #ccc;
     margin-bottom: 10px;
     font-family: inherit;
     transition: background .1s;
+    font-size: 12px;
+    height: 45px;
+    margin: 0;
+    border: 1px solid #f00;
+    box-shadow: inset 0 0 3px #f00;
+    background: #fee;
+    color: #8f5545;
+    margin-right: 10px;
+    border-radius: 4px;
 }
-.trigammon-buttons button[disabled] {
+.trigammon button[disabled] {
     cursor: not-allowed;
     opacity: .7;
 }
-.trigammon-buttons button:not([disabled]):hover {
+.trigammon button:not([disabled]):hover {
     background: #f5f5f5;
     cursor: pointer;
 }
@@ -141,6 +143,12 @@
 }
 .trigammon-dices:hover {
     cursor: pointer;
+}
+.trigammon-dices button {
+    position: absolute;
+}
+.trigammon-dices .trigammon-end-turn {
+    left: -110px;
 }
 .trigammon-dice {
     display: inline-block;
