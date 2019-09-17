@@ -16,7 +16,7 @@ class Game {
     constructor() {
         this.el = document.createElement('DIV');
         this.el.className = NAME;
-        this.turn = WHITE;
+        this.turn = BLACK;
         this.canRemove = {
             [BLACK]: false,
             [WHITE]: false
@@ -25,6 +25,7 @@ class Game {
         this.render();
     }
     init() {
+        this.turn = this.turn === WHITE ? BLACK : WHITE;
         this.board = new Array(28).fill(EMPTY);
         this.board[0] = (2 << 1) + WHITE;
         this.board[5] = (5 << 1) + BLACK;
@@ -195,6 +196,9 @@ class Game {
         this.canRemove[color] = true;
         return true;
     }
+    isGameOver() {
+        return this.getCount(REMOVED[WHITE]) === 15 || this.getCount(REMOVED[BLACK]) === 15;
+    }
     move(from, to) {
         if (!this.isAllowed(from, to))
             return false;
@@ -218,6 +222,11 @@ class Game {
         let dice = this.getJustUsedDice(from, to);
         if (dice) dice.used = true;
         this.render();
+        
+        if (this.isGameOver()) {
+            alert('GAME OVER');
+            this.init();
+        }
 
         return true;
     }
@@ -282,6 +291,38 @@ class Game {
         }
         this.checkMovesAvailable();
         this.render();
+
+        if (this.turn === BLACK) {
+            this.computerPlay();
+        }
+    }
+    computerPlay() {
+        const TIMEOUT = 500;
+        let allowed = this.getAllowedDice();
+        if (allowed.length === 0) {
+            setTimeout(() => {
+                this.endTurn();
+            }, TIMEOUT);
+        } else {
+            setTimeout(() => {
+                for (let i = PENDING[BLACK]; i <= PENDING[WHITE]; i++) {
+                    if (this.isBlack(i)) {
+                        if (this.moveCellBy(i, allowed[0])) {
+                            this.computerPlay();
+                            return;
+                        }
+                    }
+                }
+                for (let i = WIDTH - 1; i >= 0; i--) {
+                    if (this.isBlack(i)) {
+                        if (this.moveCellBy(i, allowed[0])) {
+                            this.computerPlay();
+                            return;
+                        }
+                    }
+                }
+            }, TIMEOUT);
+        }
     }
     getAllowedDice() {
         return this.dice.filter(dice => dice.allowed && !dice.used).map(dice => dice.value);
