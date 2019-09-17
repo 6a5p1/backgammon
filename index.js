@@ -116,6 +116,10 @@ class Game {
             console.log("not allowed");
             return false;
         }
+        if (to === REMOVED[this.turn] && !this.canRemove[this.turn]) {
+            console.log("not allowed");
+            return false;
+        }
         if (to === from) {
             console.log("not allowed");
             return false;
@@ -209,6 +213,7 @@ class Game {
         this.addOne(to, fromColor);
 
         this.checkIfCanRemove(fromColor);
+        this.checkIfCanRemove(toColor);
 
         let dice = this.getJustUsedDice(from, to);
         if (dice) dice.used = true;
