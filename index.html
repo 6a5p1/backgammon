@@ -2,14 +2,15 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Trigammon</title>
+    <title>Backgammon</title>
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
+    <div class="app" style="width: 1000px;"></div>
     <script src="index.js"></script>
     <script>
         let game = new Game();
-        document.body.appendChild(game.el);
+        document.body.querySelector('.app').appendChild(game.el);
     </script>
 </body>
 </html>

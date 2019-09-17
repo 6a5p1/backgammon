@@ -1,11 +1,15 @@
-const NAME = 'trigammon';
+const NAME = 'bgm';
 const EMPTY = 0;
 const BLACK = 0b0;
 const WHITE = 0b1;
 const WIDTH = 24;
+const REMOVED = {
+    [BLACK]: 24,
+    [WHITE]: 25
+}
 const PENDING = {
-    [BLACK]: 100,
-    [WHITE]: 101
+    [BLACK]: 26,
+    [WHITE]: 27
 };
 
 class Game {
@@ -13,11 +17,15 @@ class Game {
         this.el = document.createElement('DIV');
         this.el.className = NAME;
         this.turn = WHITE;
+        this.canRemove = {
+            [BLACK]: false,
+            [WHITE]: false
+        };
         this.init();
         this.render();
     }
     init() {
-        this.board = new Array(102).fill(EMPTY);
+        this.board = new Array(28).fill(EMPTY);
         this.board[0] = (2 << 1) + WHITE;
         this.board[5] = (5 << 1) + BLACK;
 
@@ -32,7 +40,7 @@ class Game {
 
         this.state = [];
 
-        // this.board = [4, 0, 4, 2, 4, 4, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 15, 5, 5, 0, 0, 9, 0, 0]
+        [WHITE, BLACK].forEach(this.checkIfCanRemove.bind(this));
 
         this.rollDice();
     }
@@ -100,65 +108,60 @@ class Game {
         return this.getCount(PENDING[color]);
     }
     isAllowed(from, to) {
-        if (from < 0 || (from >= WIDTH && from !== PENDING[WHITE] && from !== PENDING[BLACK]) ||
-            to < 0 || (to >= WIDTH && to !== PENDING[WHITE] && to !== PENDING[BLACK])) {
-            console.log("error: " + 1);
+        const A_PENDING = [PENDING[WHITE], PENDING[BLACK]];
+        const A_REMOVED = [REMOVED[WHITE], REMOVED[BLACK]];
+        const A_PENDING_REMOVED = A_PENDING.concat(A_REMOVED);
+        if (from < 0 || (from >= WIDTH && A_PENDING.indexOf(from) === -1) ||
+            to < 0 || (to >= WIDTH && A_PENDING_REMOVED.indexOf(to) === -1)) {
+            console.log("not allowed");
             return false;
         }
         if (to === from) {
-            console.log("error: " + 2);
+            console.log("not allowed");
             return false;
         }
         if (isNaN(from) || isNaN(to)) {
-            console.log("error: " + 3);
+            console.log("not allowed");
             return false;
         }
-        if (Math.abs(to - from) > 6 && from < WIDTH) {
-            console.log("error: " + 4);
+        if (Math.abs(to - from) > 6 && from < WIDTH && A_REMOVED.indexOf(to) === -1) {
+            console.log("not allowed");
             return false;
         }
         if (!this.hasMinOne(from)) {
-            console.log("error: " + 5);
+            console.log("not allowed");
             return false;
         }
         if (this.turn !== this.getColor(from)) {
-            console.log("error: " + 6);
+            console.log("not allowed");
             return false;
         }
-        if (this.hasMinTwo(to) && this.getColor(from) !== this.getColor(to)) {
-            console.log("error: " + 7);
+        if (this.hasMinTwo(to) && this.getColor(from) !== this.getColor(to) && A_REMOVED.indexOf(to) === -1) {
+            console.log("not allowed");
             return false;
         }
         if (this.isWhite(from) && from !== PENDING[WHITE] && to < from) {
-            console.log("error: " + 8);
+            console.log("not allowed");
             return false;
         }
-        if (this.isBlack(from) && to > from) {
-            console.log("error: " + 9);
+        if (this.isBlack(from) && to > from && to !== REMOVED[BLACK]) {
+            console.log("not allowed");
             return false;
         }
         if (from === PENDING[BLACK] && (to > WIDTH || to < WIDTH * 3 / 4)) {
-            console.log("error: " + 10);
+            console.log("not allowed");
             return false;
         }
         if (from === PENDING[WHITE] && (to >= WIDTH / 4)) {
-            console.log("error: " + 11);
+            console.log("not allowed");
             return false;
         }
         if (this.hasMinOne(PENDING[this.turn]) && from !== PENDING[this.turn]) {
-            console.log("error: " + 12);
+            console.log("not allowed");
             return false;
         }
-        if (this.dice.filter(dice => 
-            !dice.used && (
-                dice.value === Math.abs(to - from)
-                || (
-                    from === PENDING[this.turn]
-                    && dice.value === (this.turn === WHITE ? to + 1 : WIDTH - to)
-                )
-            )
-        ).length === 0) {
-            console.log("error: " + 13);
+        if (this.getJustUsedDice(from, to) == null) {
+            console.log("not allowed");
             return false;
         }
         return true;
@@ -168,8 +171,25 @@ class Game {
         let obj = this.state.pop();
         this.board = obj.board;
         this.dice = obj.dice;
+        this.canRemove = obj.canRemove;
 
         this.render();
+    }
+    checkIfCanRemove(color) {
+        if (this.getCapturedCount(color) > 0) {
+            this.canRemove[color] = false;
+            return false;
+        }
+        for (let i = 0; i < WIDTH; i++) {
+            if (this.isBlack(i) && i <= 5) continue;
+            if (this.isWhite(i) && i >= WIDTH - 6) continue;
+            if (this.isColor(i, color)) {
+                this.canRemove[color] = false;
+                return false;
+            }
+        }
+        this.canRemove[color] = true;
+        return true;
     }
     move(from, to) {
         if (!this.isAllowed(from, to))
@@ -178,24 +198,51 @@ class Game {
         this.state.push({
             dice: JSON.parse(JSON.stringify(this.dice)),
             board: JSON.parse(JSON.stringify(this.board)),
-            turn: this.turn
+            canRemove: JSON.parse(JSON.stringify(this.canRemove)),
         });
 
         let fromColor = this.getColor(from);
         let toColor = this.getColor(to);
         this.removeOne(from);
-        if (fromColor !== toColor && this.hasOne(to))
+        if (to < WIDTH && fromColor !== toColor && this.hasOne(to))
             this.capture(to);
         this.addOne(to, fromColor);
 
-        let dice = this.dice.find(d => (
-            (d.value === Math.abs(to - from) || (from === PENDING[this.turn] && d.value === (this.turn === WHITE ? to + 1 : WIDTH - to)))
-            && d.used === false
-        ));
+        this.checkIfCanRemove(fromColor);
+
+        let dice = this.getJustUsedDice(from, to);
         if (dice) dice.used = true;
         this.render();
 
         return true;
+    }
+    isFreeBetween(from, to, color) {
+        if (from > to) {
+            let temp = from;
+            from = to;
+            to = temp;
+        }
+        for (let i = from; i <= to; i++) {
+            if (this.getColor(i) === color) {
+                return false;
+            }
+        }
+        return true;
+    }
+    getJustUsedDice(from, to) {
+        return this.dice.find(dice => (
+            !dice.used && (
+                (from !== PENDING[this.turn] && to !== REMOVED[this.turn] && dice.value === Math.abs(to - from))
+                || (from === PENDING[this.turn] && dice.value === (this.turn === WHITE ? to + 1 : WIDTH - to))
+                || (to === REMOVED[this.turn] && 
+                    (
+                        dice.value === (this.turn === BLACK ? from + 1 : WIDTH - from)
+                        || (this.isFreeBetween(this.turn === BLACK ? from + 1 : from - 1, this.turn === BLACK ? 5 : WIDTH - 6, this.turn)
+                                && dice.value > (this.turn === BLACK ? from + 1 : WIDTH - from))
+                    )
+                )
+            )
+        ));
     }
     endTurn() {
         if (this.checkMovesAvailable()) return this.render();
@@ -231,17 +278,41 @@ class Game {
         this.checkMovesAvailable();
         this.render();
     }
+    getAllowedDice() {
+        return this.dice.filter(dice => dice.allowed && !dice.used).map(dice => dice.value);
+    }
     moveCellBy(cell, dice) {
         if (this.isWhite(cell)) 
             if (cell === PENDING[WHITE])
                 return this.move(cell, dice - 1);
+            else if (cell + dice >= WIDTH)
+                return this.move(cell, REMOVED[WHITE]);
             else
                 return this.move(cell, cell + dice);
         else if (this.isBlack(cell)) 
             if (cell === PENDING[BLACK])
                 return this.move(cell, WIDTH - dice);
+            else if (cell - dice < 0)
+                return this.move(cell, REMOVED[BLACK]);
             else
                 return this.move(cell, cell - dice);
+        return false;
+    }
+    getCellByIfAvailable(cell, dice) {
+        if (this.isWhite(cell)) 
+            if (cell === PENDING[WHITE])
+                return this.isAllowed(cell, dice - 1) && dice - 1;
+            else if (cell + dice >= WIDTH)
+                return this.isAllowed(cell, REMOVED[WHITE]);
+            else
+                return this.isAllowed(cell, cell + dice) && cell + dice;
+        else if (this.isBlack(cell)) 
+            if (cell === PENDING[BLACK])
+                return this.isAllowed(cell, WIDTH - dice) && WIDTH - dice;
+            else if (cell - dice < 0)
+                return this.isAllowed(cell, REMOVED[BLACK]);
+            else
+                return this.isAllowed(cell, cell - dice) && cell - dice;
         return false;
     }
     isDiceAvailable(dice) {
@@ -250,9 +321,9 @@ class Game {
         if (this.turn === BLACK && this.hasMinOne(PENDING[this.turn]))
             return this.getCount(WIDTH - dice) < 2 || this.getColor(WIDTH - dice) === this.turn;
         for (let i = 0; i < WIDTH; i++) {
-            if (this.hasMinOne(i) && WHITE === this.turn && this.isAllowed(i, i + dice))
+            if (this.hasMinOne(i) && WHITE === this.turn && this.isAllowed(i, i + dice >= WIDTH ? REMOVED[WHITE] : i + dice))
                 return true;
-            if (this.hasMinOne(i) && BLACK === this.turn && this.isAllowed(i, i - dice))
+            if (this.hasMinOne(i) && BLACK === this.turn && this.isAllowed(i, i - dice < 0 ? REMOVED[BLACK] : i - dice))
                 return true;
         }
         return false;
@@ -261,13 +332,13 @@ class Game {
         for (let i = 0; i < this.dice.length; i++) {
             this.dice[i].allowed = this.isDiceAvailable(this.dice[i].value);
         }
-        return this.dice.filter(dice => dice.allowed && !dice.used).length > 0;
+        return this.getAllowedDice().length > 0;
     }
 
 
     renderBoard() {
         const MAX = 5;
-        let q = new Array(6).fill('');
+        let q = new Array(8).fill('');
         for (let i = WIDTH / 2 - 1; i >= WIDTH / 4; i--) {
             q[0] += `<div data-cell="${i}"><div class="flex-c">`;
             let count = this.board[i] >> 1;
@@ -315,6 +386,20 @@ class Game {
             q[5] += `<span class="cell ${this.board[PENDING[WHITE]] % 2 == 0 ? 'cell-black' : 'cell-white'} ${this.toDrag === PENDING[WHITE] ? 'dragged' : ''}">${showW ? totalW : ''}</span>`;
         q[5] += '</div></div>';
 
+        let totalRW = this.board[REMOVED[WHITE]] >> 1;
+        let showRW = totalRW >= 1;
+        q[6] += `<div data-cell="${REMOVED[WHITE]}" class="removed-white"><div class="flex-c">`;
+        for (let j = 0; j < (showRW ? 1 : 0); j++)
+            q[6] += `<span class="cell cell-removed ${this.board[REMOVED[WHITE]] % 2 == 0 ? 'cell-black' : 'cell-white'}">${showRW ? totalRW : ''}</span>`;
+        q[6] += '</div></div>';
+
+        let totalRB = this.board[REMOVED[BLACK]] >> 1;
+        let showRB = totalRB >= 1;
+        q[7] += `<div data-cell="${REMOVED[BLACK]}" class="removed-black"><div class="flex-c">`;
+        for (let j = 0; j < (showRB ? 1 : 0); j++)
+            q[7] += `<span class="cell cell-removed ${this.board[REMOVED[BLACK]] % 2 == 0 ? 'cell-black' : 'cell-white'}">${showRB ? totalRB : ''}</span>`;
+        q[7] += '</div></div>';
+
         return `${q.map((w, i) => `<div class="q${i}">${w}</div>`).join('')}
             <div class="${NAME}-dices ${NAME}-dices-${this.turn === WHITE ? 'white' : 'black'} ${this.dice.length === 4 ? `${NAME}-dices-double` : ''}">
                 ${this.dice.filter(d => !d.used && d.allowed).length === 0 ? `<button class="${NAME}-end-turn">END TURN</button>` : ''}
@@ -324,22 +409,32 @@ class Game {
     }
     initEvents() {
         let FROM = -1;
+        let cells = [].slice.apply(this.el.querySelectorAll('[data-cell]'));
         let pieces = [].slice.apply(this.el.querySelectorAll(`.cell.cell-${this.turn === WHITE ? 'white' : 'black'}`));
         pieces.forEach(piece => {
             piece.draggable = true;
             piece.addEventListener('dragstart', (event) => {
                 FROM = +event.target.closest('[data-cell]').dataset.cell;
                 event.dataTransfer.setData("text/plain", FROM);
-                // event.target.classList.add('dragged');
+                cells.forEach(cell => cell.classList.remove('allowed'));
+                let available = this.getAllowedDice();
+                const checkAvailable = (dice) => {
+                    let nextPos = this.getCellByIfAvailable(FROM, dice);
+                    if (nextPos !== false) {
+                        let cell = cells.filter(cell => cell.dataset.cell == nextPos);
+                        if (cell.length) cell[0].classList.add('allowed');
+                    }
+                };
+                available.forEach(checkAvailable);
             });
             piece.addEventListener('click', (event) => {
                 event.preventDefault();
-                let dice = this.dice.filter(d => !d.used && d.allowed);
+                let dice = this.getAllowedDice();
                 if (dice.length === 0) return false;
                 FROM = +event.target.closest('[data-cell]').dataset.cell;
-                let moveStatus = this.moveCellBy(FROM, dice[0].value);
+                let moveStatus = this.moveCellBy(FROM, dice[0]);
                 if (moveStatus === false && dice[1]) {
-                    moveStatus = this.moveCellBy(FROM, dice[1].value);
+                    moveStatus = this.moveCellBy(FROM, dice[1]);
                 }
                 if (moveStatus !== false) {
                     this.checkMovesAvailable();
@@ -348,23 +443,26 @@ class Game {
             });
         });
 
-        let cells = [].slice.apply(this.el.querySelectorAll('[data-cell]'));
         cells.forEach(cell => {
             cell.addEventListener('dragover', (event) => {
                 let cell = event.target.closest('[data-cell]');
                 let to = +cell.dataset.cell;
                 if (this.isAllowed(FROM, to)) {
-                    console.log(FROM, to, 'allowed');
                     event.preventDefault();
                     cells.forEach(cell => cell.classList.remove('dragover'));
                     cell.classList.add('dragover');
                 }
             });
+            cell.addEventListener('dragend', (event) => {
+                cells.forEach(cell => {
+                    cell.classList.remove('allowed');
+                    cell.classList.remove('dragover');
+                });
+            });
             cell.addEventListener('drop', (event) => {
                 event.preventDefault();
                 let cell = event.target.closest('[data-cell]');
                 cells.forEach(cell => cell.classList.remove('dragover'));
-                console.log('drop');
                 let from = +event.dataTransfer.getData("text/plain");
                 let to = +cell.dataset.cell;
                 if (this.move(from, to)) {
