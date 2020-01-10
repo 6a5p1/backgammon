@@ -308,6 +308,7 @@ class Game {
                 for (let i = PENDING[BLACK]; i <= PENDING[WHITE]; i++) {
                     if (this.isBlack(i)) {
                         if (this.moveCellBy(i, allowed[0])) {
+                            this.checkMovesAvailable();
                             this.computerPlay();
                             return;
                         }
@@ -316,6 +317,7 @@ class Game {
                 for (let i = WIDTH - 1; i >= 0; i--) {
                     if (this.isBlack(i)) {
                         if (this.moveCellBy(i, allowed[0])) {
+                            this.checkMovesAvailable();
                             this.computerPlay();
                             return;
                         }
