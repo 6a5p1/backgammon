@@ -80,8 +80,8 @@
     box-shadow: inset 0 0 5px #fff;
 }
 .bgm [data-cell] .cell-white {
-    background: #fff;
-    border: 1px solid #ddd;
+    background: #faeaca;
+    border: 1px solid #cacaaa;
 }
 .bgm [data-cell] .cell-black {
     background: #444;
@@ -133,16 +133,24 @@
 .bgm .q7 {
     position: absolute;
     left: 100%;
-    width: calc((100% - 50px )/ 12);
-    background: #394c73;
+    width: calc((100% - 50px ) / 12 + 25px);
+    background: #ecf0f2;;
+    border-right: 25px solid #394b72;
 }
+.bgm .q6 > div,
+.bgm .q7 > div {
+    border-left: 1px dashed #394b72;
+}
+
 .bgm .q6 {
     top: 50%;
-    bottom: 0;
+    bottom: -25px;
+    border-bottom: 25px solid #394b72;
 }
 .bgm .q7 {
-    top: 0;
+    top: -25px;
     bottom: 50%;
+    border-top: 25px solid #394b72;
 }
 
 .bgm .flex-c {
